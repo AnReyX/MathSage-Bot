@@ -74,9 +74,9 @@ async def Message_Handler(update, context):
         except:
             await update.message.reply_text('Извините, но вы указали неверный пример')
     elif 'время' in message:
-        time_command()
+        await time_command(update, context)
     elif 'дата' in message or 'день' in message:
-        data_command()
+        await date_command(update, context)
     elif 'покажи' in message:
        # geocoder_request = "http://geocode-maps.yandex.ru/1.x/?apikey=40d1649f-0493-4b70-98ba-98533de7710b&geocode" \
         #                   f"={message.split()[1:]}, 1&format=json"
@@ -110,12 +110,12 @@ async def help_command(update, context):
     await update.message.reply_text("Для работы бота нпиши расскажи о ... / что такое ... / посчитай ...")
 
 
-async def date_command():
+async def date_command(update, context):
     await update.message.reply_text(f"Текущая дата: {time.asctime().split()[1:3]}")
 
 
-async def time_command():
-    await update.message.reply_text(f"Текущее время: {time.asctime().split()[3]}")   
+async def time_command(update, context):
+    await update.message.reply_text(f"Текущее время: {time.asctime().split()[3]}")
 
 
 def main():
