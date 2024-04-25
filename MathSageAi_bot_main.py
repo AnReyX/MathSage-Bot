@@ -5,8 +5,15 @@ from Bot_DB import BOT_DATA_BASE
 from Bot_Simple_Prases import SIMPLE_PRASES
 from telegram.ext import CommandHandler
 import time
+import sqlite3
+from random import choice
 
 current_theme = ''
+is_in_task = [False, '', 0]
+d = {'logarithms': range(1, 4), 'exponents': range(4, 7), 'derivatives': range(7, 10), 'probability': range(10, 13),
+     'stereometry': range(13, 16), 'trigonometry': range(16, 19)}
+con = sqlite3.connect('DATA/DB_tasks/tasks_db.sqlite')
+cur = con.cursor()
 theory = {'logarithms': {'definition': (open('DATA/logarithms/definition.txt', encoding='UTF-8'),
                               open('DATA/logarithms/log.png', 'rb')),
                          'equations': (open('DATA/logarithms/equations.txt', encoding='UTF-8'),
@@ -133,10 +140,21 @@ async def commands(update, context):
 
 
 async def tasks(update, context):
-    if current_theme:
-        await update.message.reply_text(f"Здесь скоро будут задачи на тему {current_theme}")
+    global is_in_task
+    if not current_theme:
+        await update.message.reply_text(f"Выберите тему.")
+    elif not is_in_task[0]:
+        t = choice(d[current_theme])
+        task, answer, image = cur.execute(f"""SELECT t.task, t.answer, t.images_link FROM
+                                          Tasks_Data t WHERE t.id = {t}""").fetchone()
+        if image != '-':
+            await context.bot.send_photo(update.message.chat_id, photo=open(f'DATA/DB_tasks/{image}', 'rb'),
+                                         caption=f"Задача №{t}. {task}")
+        else:
+            await update.message.reply_text(f"Задача №{t}. {task}")
+        is_in_task = [True, answer, t]
     else:
-        await update.message.reply_text("Хоть вы и не выбрали тему, но задачек пока что нет!")
+        await update.message.reply_text(f"Чтобы решить следующую задачу, дайте ответ на эту.")
 
 
 async def definition(update, context):
@@ -325,31 +343,43 @@ async def time_command(update, context):
 
 
 async def Message_Handler(update, context):
+    global is_in_task
     message = update.message.text.lower()
-    if 'посчитай' in message:
-        try:
-            await update.message.reply_text(eval(''.join(message.split()[1:])))
-        except Exception:
-            await update.message.reply_text('Извините, но вы указали неверный пример')
-    elif 'время' in message:
-        await update.message.reply_text(f"Текущее время: {', '.join(time.asctime().split()[3])}")
-    elif 'дата' in message or 'день' in message:
-        await update.message.reply_text(f"Текущая дата: {time.asctime().split()[1:3]}")
-    elif 'расскажи о' in message or 'что такое' in message:
-        if len(message.split()) > 2:
-            if len(message.split()) == 3:
-                search_word = message.split()[2]
-                for i in range(0, len(search_word)):
-                    if search_word in BOT_DATA_BASE.keys():
-                        await update.message.reply_text(BOT_DATA_BASE[search_word])
-                        break
-                    search_word = search_word[:-1]
-                else:
-                    await update.message.reply_text('Извините, по вашему запросу ничего не нашлось.')
+    if is_in_task[0]:
+        if message.strip() == is_in_task[1]:
+            await update.message.reply_text('Верно! Вы молодцы!')
+            cur.execute(f'UPDATE Tasks_Data SET is_solved = "True" WHERE ID = {is_in_task[2]}')
+            con.commit()
+            is_in_task = [False, '', 0]
         else:
-            await update.message.reply_text('Извините, но я не понял, что именно вы хотите узнать. Повторите запрос.')
+            await update.message.reply_text('Неправильно, попробуйте позже.')
+            is_in_task = [False, '', 0]
     else:
-        await update.message.reply_text('Извините, я вас не понял. Повторите запрос.')
+        if 'посчитай' in message:
+            try:
+                await update.message.reply_text(eval(''.join(message.split()[1:])))
+            except Exception:
+                await update.message.reply_text('Извините, но вы указали неверный пример')
+        elif 'время' in message:
+            await update.message.reply_text(f"Текущее время: {', '.join(time.asctime().split()[3])}")
+        elif 'дата' in message or 'день' in message:
+            await update.message.reply_text(f"Текущая дата: {time.asctime().split()[1:3]}")
+        elif 'расскажи о' in message or 'что такое' in message:
+            if len(message.split()) > 2:
+                if len(message.split()) == 3:
+                    search_word = message.split()[2]
+                    for i in range(0, len(search_word)):
+                        if search_word in BOT_DATA_BASE.keys():
+                            await update.message.reply_text(BOT_DATA_BASE[search_word])
+                            break
+                        search_word = search_word[:-1]
+                    else:
+                        await update.message.reply_text('Извините, по вашему запросу ничего не нашлось.')
+            else:
+                await update.message.reply_text('Извините, но я не понял, что именно вы хотите узнать.'
+                                                ' Повторите запрос.')
+        else:
+            await update.message.reply_text('Извините, я вас не понял. Повторите запрос.')
 
 
 def main():
